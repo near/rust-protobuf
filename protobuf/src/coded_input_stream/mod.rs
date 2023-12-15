@@ -10,7 +10,7 @@ use std::mem;
 use std::mem::MaybeUninit;
 
 #[cfg(feature = "bytes")]
-use ::bytes::Bytes;
+use bytes::Bytes;
 
 #[cfg(feature = "bytes")]
 use crate::chars::Chars;
@@ -510,7 +510,7 @@ impl<'a> CodedInputStream<'a> {
         self.read_repeated_packed_into::<ProtobufTypeInt32>(target)
     }
 
-    fn skip_group(&mut self) -> crate::Result<()> {
+    fn _skip_group(&mut self) -> crate::Result<()> {
         while !self.eof()? {
             let wire_type = self.read_tag_unpack()?.1;
             if wire_type == WireType::EndGroup {
@@ -533,9 +533,8 @@ impl<'a> CodedInputStream<'a> {
                     .map(|v| UnknownValue::LengthDelimited(v))
             }
             WireType::StartGroup => {
-                self.skip_group()?;
-                // We do not support groups, so just return something.
-                Ok(UnknownValue::LengthDelimited(Vec::new()))
+                // Just error out if anything related to groups is present
+                Err(ProtobufError::WireError(WireError::UnexpectedWireType(wire_type)).into())
             }
             WireType::EndGroup => {
                 Err(ProtobufError::WireError(WireError::UnexpectedWireType(wire_type)).into())
@@ -553,7 +552,10 @@ impl<'a> CodedInputStream<'a> {
                 let len = self.read_raw_varint32()?;
                 self.skip_raw_bytes(len)
             }
-            WireType::StartGroup => self.skip_group(),
+            WireType::StartGroup => {
+                // Just error out if anything related to groups is present
+                Err(ProtobufError::WireError(WireError::UnexpectedWireType(wire_type)).into())
+            }
             WireType::EndGroup => {
                 Err(ProtobufError::WireError(WireError::UnexpectedWireType(wire_type)).into())
             }
@@ -927,6 +929,7 @@ mod test {
     }
 
     // Copy of this test: https://tinyurl.com/34hfavtz
+    #[ignore]
     #[test]
     fn test_skip_group() {
         // Create an output stream with a group in:
